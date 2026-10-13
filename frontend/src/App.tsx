@@ -39,7 +39,12 @@ type ProbeResult = {
 };
 
 export default function App() {
-  const apiUrl = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000';
+  const configuredApiUrl = import.meta.env.VITE_API_URL as string | undefined;
+  const apiUrl = (
+    configuredApiUrl
+      ? (/^https?:\/\//i.test(configuredApiUrl) ? configuredApiUrl : `https://${configuredApiUrl}`)
+      : 'http://localhost:8000'
+  ).replace(/\/+$/, '');
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authChecked, setAuthChecked] = useState(false);

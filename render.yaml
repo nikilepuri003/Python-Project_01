@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: codepulse-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: APP_ENV
+        value: production
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: codepulse-frontend
+          property: host
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: JWT_SECRET_KEY
+        generateValue: true
+
+  - type: web
+    name: codepulse-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: codepulse-backend
+          property: host
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false

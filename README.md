@@ -42,6 +42,17 @@ npm run dev -- --host 0.0.0.0 --port 5173
 docker compose up --build
 ```
 
+### Deploy on Render
+
+The root `render.yaml` deploys the frontend as a static site and the FastAPI backend as a free web service. The current backend does not use PostgreSQL, so this setup does not create an unused database.
+
+1. Push the project to GitHub.
+2. In Render, create a new Blueprint and select this repository. Render reads `render.yaml` from the repository root.
+3. When prompted, enter the same Google OAuth client ID for `GOOGLE_CLIENT_ID` and `VITE_GOOGLE_CLIENT_ID`.
+4. After deployment, add the frontend's `onrender.com` URL to the OAuth client's **Authorized JavaScript origins** in Google Cloud Console.
+
+Free Render web services spin down after 15 minutes without traffic, so the first request after inactivity can take about a minute. This is suitable for a demo, not production.
+
 ### Demo: end-to-end incident lifecycle
 
 ```bash
