@@ -14,6 +14,8 @@ Set the same Google OAuth client ID in `frontend/.env.local` as `VITE_GOOGLE_CLI
 
 The frontend shows a Google sign-in screen before loading the dashboard. New users can continue with Google from the same button; their Google identity creates a persistent account on first sign-in. Local development defaults to SQLite at `backend/codepulse.db`; production must set `DATABASE_URL` to a persistent PostgreSQL database.
 
+Draft public policy pages are served at `/privacy.html` and `/terms.html`. They are marked for owner review and must be approved before adding them to Google OAuth branding or publishing the OAuth app.
+
 ### Check a website's health
 
 After signing in, enter a public website URL and choose **Check website**. The backend makes one HTTP(S) request (10-second timeout, without following redirects) and reports the observed HTTP status, reachability, and response time. A successful HTTP response only confirms that URL responded; it does not verify the website's database or other internal services. Private/local network addresses are rejected.

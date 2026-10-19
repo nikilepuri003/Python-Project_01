@@ -191,6 +191,10 @@ export default function App() {
           {authError && <p className="mt-5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-left text-sm text-rose-200" role="alert">{authError}</p>}
           {authNotice && <p className="mt-5 text-sm text-emerald-300" role="status">{authNotice}</p>}
           <p className="mt-6 text-xs text-slate-500">New to CodePulse? Continue with Google to get started.</p>
+          <nav className="mt-6 flex justify-center gap-5 text-xs text-slate-500" aria-label="Legal">
+            <a className="hover:text-slate-300" href="/privacy.html">Privacy Policy</a>
+            <a className="hover:text-slate-300" href="/terms.html">Terms of Service</a>
+          </nav>
         </section>
       </main>
     );

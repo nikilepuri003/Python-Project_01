@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Draft privacy policy for CodePulse AI." />
+    <title>Privacy Policy - CodePulse AI</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; background: #020617; color: #e2e8f0; }
+      body { margin: 0; }
+      main { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; line-height: 1.7; }
+      h1, h2 { color: #f8fafc; line-height: 1.25; }
+      h1 { font-size: 2.25rem; }
+      h2 { margin-top: 2rem; font-size: 1.25rem; }
+      a { color: #67e8f9; }
+      .draft { border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; color: #fde68a; background: #451a03; }
+      .muted { color: #94a3b8; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p><a href="/">CodePulse AI</a></p>
+      <h1>Privacy Policy</h1>
+      <p class="muted">Last updated: October 19, 2026</p>
+      <p class="draft"><strong>Draft for owner review.</strong> This page is not approved for Google OAuth publication yet.</p>
+
+      <p>This policy describes information handled by the CodePulse AI website health-check application, operated by the project owner. It is an early-stage service and this draft should be reviewed before public launch.</p>
+
+      <h2>Information we process</h2>
+      <ul>
+        <li><strong>Google sign-in profile:</strong> when you sign in, Google provides a stable account identifier, verified email address, name, and profile photo. CodePulse uses these details to create or update your account. CodePulse does not receive or store your Google password.</li>
+        <li><strong>Sign-in session:</strong> the browser stores a randomly generated session token in local storage. The backend stores a one-way SHA-256 hash of that token. A session expires after 30 days or when you sign out.</li>
+        <li><strong>Website checks:</strong> if you submit a public website URL, the backend makes an HTTP or HTTPS request to that address and returns the observed response status and timing. The submitted URL is not saved in your account record. Do not submit URLs containing passwords, access tokens, or other secrets.</li>
+        <li><strong>Operational logs:</strong> the service records technical request details such as endpoint, method, response status, timing, and request identifier to operate and troubleshoot the service. Hosting providers may independently process service and access logs.</li>
+      </ul>
+
+      <h2>How information is used</h2>
+      <p>We use the Google profile to authenticate you and maintain your account, the session token to keep you signed in, and website-check input only to perform the check you request. Operational details are used to maintain and troubleshoot the application.</p>
+
+      <h2>Service providers</h2>
+      <p>Google provides sign-in. Vercel hosts the website, and Render hosts the backend and account database. These providers may process information as needed to provide their services and under their own terms and privacy policies. The application does not currently use profile information for advertising.</p>
+
+      <h2>Storage and retention</h2>
+      <p>Account profile information is stored in the application database while the account is retained. Session records are stored as hashes and expire after 30 days; signing out removes the current session. To request account deletion or correction, contact <a href="mailto:justnikiepuri@gmail.com">justnikiepuri@gmail.com</a>. Provider backups and operational logs may have separate retention periods.</p>
+      <p><strong>Temporary deployment notice:</strong> this deployment currently uses a free Render database scheduled to expire on November 18, 2026. If it is not upgraded before then, Render may delete the database and account records, and those records may not be recoverable.</p>
+
+      <h2>Security</h2>
+      <p>We use HTTPS for the public service and store a hash, rather than the raw session token, in the account database. No internet service can guarantee perfect security, and you should sign out on shared devices.</p>
+
+      <h2>Changes and contact</h2>
+      <p>This policy may be updated as the service changes. Material changes will be reflected on this page. For privacy questions or account requests, email <a href="mailto:justnikiepuri@gmail.com">justnikiepuri@gmail.com</a>.</p>
+      <p><a href="/terms.html">Terms of Service</a></p>
+    </main>
+  </body>
+</html>
