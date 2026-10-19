@@ -6,10 +6,19 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
+from sqlalchemy.orm import Session
 
 from app.anomaly.engine import AnomalyDetector
+from app.core.auth_sessions import (
+    create_user_session,
+    find_session_user,
+    get_or_create_user,
+    revoke_user_session,
+    serialize_user,
+)
 from app.core.config import get_settings
+from app.core.database import get_db
 from app.core.security import verify_google_oauth_token
 from app.detection.engine import DetectionEngine
 from app.diagnosis.engine import DiagnosisEngine
@@ -30,12 +39,6 @@ patch_generator = PatchGenerator()
 validation_engine = ValidationEngine()
 validation_pipeline = ValidationPipeline()
 github_service = GitHubService()
-
-# In-memory user session
-CURRENT_USER: dict[str, Any] = {
-    "authenticated": False,
-    "user": None,
-}
 
 # In-memory scenario state
 CURRENT_SCENARIO: dict[str, Any] = {
@@ -61,7 +64,7 @@ CURRENT_SCENARIO: dict[str, Any] = {
 
 
 @router.post("/auth/google")
-def google_auth(payload: dict[str, Any]) -> dict[str, Any]:
+def google_auth(payload: dict[str, Any], db: Session = Depends(get_db)) -> dict[str, Any]:
     """Authenticate and verify a user via Google OAuth."""
     token = payload.get("token") or payload.get("credential")
     email = payload.get("email")
@@ -70,7 +73,10 @@ def google_auth(payload: dict[str, Any]) -> dict[str, Any]:
 
     if not isinstance(token, str) or not token:
         raise HTTPException(status_code=400, detail="A Google credential is required.")
-    if not token.startswith("google-oauth-demo") and not get_settings().google_client_id:
+    settings = get_settings()
+    if not settings.google_client_id and (
+        not token.startswith("google-oauth-demo") or settings.app_env == "production"
+    ):
         raise HTTPException(status_code=503, detail="Google sign-in is not configured on the backend.")
 
     try:
@@ -78,27 +84,40 @@ def google_auth(payload: dict[str, Any]) -> dict[str, Any]:
     except ValueError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
 
-    CURRENT_USER["authenticated"] = True
-    CURRENT_USER["user"] = user_profile
+    user, created = get_or_create_user(db, user_profile)
+    session_token = create_user_session(db, user)
 
     return {
         "status": "success",
-        "message": f"Successfully authenticated as {user_profile['name']}",
-        "user": user_profile,
+        "message": f"Successfully authenticated as {user.name or user.email}",
+        "user": serialize_user(user),
+        "session_token": session_token,
+        "account_created": created,
     }
 
 
 @router.get("/auth/me")
-def get_current_user() -> dict[str, Any]:
+def get_current_user(
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
     """Get the currently authenticated user profile."""
-    return CURRENT_USER
+    scheme, _, token = (authorization or "").partition(" ")
+    user = find_session_user(db, token if scheme.lower() == "bearer" else None)
+    return {
+        "authenticated": user is not None,
+        "user": serialize_user(user) if user else None,
+    }
 
 
 @router.post("/auth/logout")
-def logout() -> dict[str, Any]:
+def logout(
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
     """Log out the current user session."""
-    CURRENT_USER["authenticated"] = False
-    CURRENT_USER["user"] = None
+    scheme, _, token = (authorization or "").partition(" ")
+    revoke_user_session(db, token if scheme.lower() == "bearer" else None)
     return {"status": "logged_out", "message": "User session cleared"}
 
 

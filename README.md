@@ -12,7 +12,7 @@ The project has already implemented the backend detection, diagnosis, patching, 
 
 Set the same Google OAuth client ID in `frontend/.env.local` as `VITE_GOOGLE_CLIENT_ID` and in `backend/.env` (or the backend process environment) as `GOOGLE_CLIENT_ID`. For Docker Compose, provide both variables in the root `.env` file. Add the frontend origin (for local development, `http://localhost:5173`) to the OAuth client's **Authorized JavaScript origins** in Google Cloud Console. Restart the frontend and backend after changing environment values.
 
-The frontend shows a Google sign-in screen before loading the dashboard. New users can continue with Google from the same button.
+The frontend shows a Google sign-in screen before loading the dashboard. New users can continue with Google from the same button; their Google identity creates a persistent account on first sign-in. Local development defaults to SQLite at `backend/codepulse.db`; production must set `DATABASE_URL` to a persistent PostgreSQL database.
 
 ### Check a website's health
 
@@ -44,7 +44,7 @@ docker compose up --build
 
 ### Deploy on Render
 
-The root `render.yaml` deploys the frontend as a static site and the FastAPI backend as a free web service. The current backend does not use PostgreSQL, so this setup does not create an unused database.
+The root `render.yaml` deploys the frontend as a static site and the FastAPI backend as a free web service. Persistent user accounts require a PostgreSQL database: create one in Render and set the backend service's `DATABASE_URL` to its **internal** connection string. Use a paid database plan for accounts that must not expire; Render's free database plans may have limited lifetime and no production guarantees.
 
 1. Push the project to GitHub.
 2. In Render, create a new Blueprint and select this repository. Render reads `render.yaml` from the repository root.

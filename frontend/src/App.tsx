@@ -59,13 +59,20 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    const sessionToken = localStorage.getItem('codepulse_session_token');
 
     async function loadCurrentUser() {
       try {
-        const response = await fetch(`${apiUrl}/api/v1/auth/me`);
+        const response = await fetch(`${apiUrl}/api/v1/auth/me`, {
+          headers: sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {},
+        });
         if (!response.ok) throw new Error(`Authentication check failed (${response.status}).`);
         const result: { authenticated?: boolean; user?: UserProfile | null } = await response.json();
-        if (!cancelled && result.authenticated && result.user) setUser(result.user);
+        if (!cancelled && result.authenticated && result.user) {
+          setUser(result.user);
+        } else if (!cancelled) {
+          localStorage.removeItem('codepulse_session_token');
+        }
       } catch {
         if (!cancelled) setAuthError('Could not reach the CodePulse server. Make sure the backend is running, then try again.');
       } finally {
@@ -103,10 +110,11 @@ export default function App() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ credential }),
             });
-            const result: { user?: UserProfile; detail?: string } = await response.json();
-            if (!response.ok || !result.user) {
+            const result: { user?: UserProfile; session_token?: string; detail?: string } = await response.json();
+            if (!response.ok || !result.user || !result.session_token) {
               throw new Error(result.detail ?? 'Google sign-in could not be completed.');
             }
+            localStorage.setItem('codepulse_session_token', result.session_token);
             setUser(result.user);
           } catch (error) {
             setAuthError(error instanceof Error ? error.message : 'Google sign-in could not be completed.');
@@ -148,8 +156,13 @@ export default function App() {
 
   async function signOut() {
     try {
-      const response = await fetch(`${apiUrl}/api/v1/auth/logout`, { method: 'POST' });
+      const sessionToken = localStorage.getItem('codepulse_session_token');
+      const response = await fetch(`${apiUrl}/api/v1/auth/logout`, {
+        method: 'POST',
+        headers: sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {},
+      });
       if (!response.ok) throw new Error(`Sign-out failed (${response.status}).`);
+      localStorage.removeItem('codepulse_session_token');
       setUser(null);
       setAuthNotice('You have been signed out.');
       setAuthError('');

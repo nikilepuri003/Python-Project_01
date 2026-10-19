@@ -14,6 +14,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_
 
 from app.api.v1.routes import router as v1_router
 from app.core.config import get_settings
+from app.core.database import initialize_database
 from app.core.logging import get_logger
 
 settings = get_settings()
@@ -88,6 +89,11 @@ def metrics() -> Response:
 
 
 app.include_router(v1_router)
+
+
+@app.on_event("startup")
+def initialize_database_tables() -> None:
+    initialize_database()
 
 
 @app.get("/")

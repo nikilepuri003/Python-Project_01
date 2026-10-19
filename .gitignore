@@ -26,3 +26,5 @@ tmp_*.err
 tmp_*.log
 a.txt
 tools/
+.vercel
+backend/*.db

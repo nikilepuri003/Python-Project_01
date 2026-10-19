@@ -21,7 +21,7 @@ def verify_google_oauth_token(
     For demo/dev mode: if token starts with 'google-oauth-demo', accept it
     and build a profile from the supplied email/name/picture.
     """
-    if token and token.startswith("google-oauth-demo"):
+    if token and token.startswith("google-oauth-demo") and get_settings().app_env != "production":
         # Demo mode — accept without network call
         resolved_email = email or "demo@codepulse.ai"
         resolved_name = name or "Demo User"
