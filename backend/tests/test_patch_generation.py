@@ -1,5 +1,6 @@
 from app.patching.engine import PatchGenerator
 from app.validation.engine import ValidationEngine
+from app.validation.pipeline import ValidationPipeline
 
 
 def test_patch_generator_creates_minimal_diff_for_payment_service() -> None:
@@ -26,15 +27,16 @@ def test_patch_generator_creates_minimal_diff_for_payment_service() -> None:
     assert "--- a/services/payment_service/main.py" in patch.diff
     assert patch.confidence >= 0.7
     assert len(patch.risks) >= 1
+    assert "status" in patch.diff and "queued" in patch.diff
 
 
 def test_validation_engine_accepts_patch_with_unified_diff() -> None:
     validation = ValidationEngine()
     patch = {
-        "diff": "--- a/services/payment_service/main.py\n+++ b/services/payment_service/main.py\n@@\n- old\n+ new\n",
+        "diff": "--- a/services/payment_service/main.py\n+++ b/services/payment_service/main.py\n@@ -1 +1 @@\n-old\n+new\n",
     }
 
     result = validation.validate(patch)
 
     assert result.passed is True
-    assert "format_check" in result.checks
+    assert result.details["target_check"] == "passed"

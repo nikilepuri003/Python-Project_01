@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import difflib
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 
@@ -17,82 +19,67 @@ class PatchProposal:
 
 
 class PatchGenerator:
-    """Generate a minimal patch proposal for a detected incident."""
+    """Build the reviewed demo payment-service patch from its checked-in source."""
 
-    def generate(self, incident: dict[str, Any], diagnosis: dict[str, Any]) -> PatchProposal:
-        service = str(incident.get("service") or "unknown-service")
-        evidence = incident.get("evidence") or {}
-        error_rate = float(evidence.get("error_rate", 0.0) or 0.0)
-        timeout_rate = float(evidence.get("timeout_rate", 0.0) or 0.0)
-        latency_ms = float(evidence.get("p95_latency_ms", 0.0) or 0.0)
+    FILE_PATH = "services/payment_service/main.py"
+    OLD_BLOCK = '''        if mode == "database_timeout":
+            logger.warning("payment mode set to database_timeout")
+            with tracer.start_as_current_span("payment_service.database_query"):
+                await asyncio.sleep(6)
+            raise HTTPException(status_code=504, detail={"code": "DATABASE_TIMEOUT", "message": "Database timed out while processing payment"})
+'''
+    NEW_BLOCK = '''        if mode == "database_timeout":
+            logger.warning("payment mode set to database_timeout")
+            with tracer.start_as_current_span("payment_service.database_query"):
+                await asyncio.sleep(2)
+            return {
+                "status": "queued",
+                "payment_id": "pay_demo_456",
+                "message": "Payment request accepted but queued for retry due to dependency delay.",
+            }
+'''
 
-        file_path = "services/payment_service/main.py"
-        if "order" in service.lower():
-            file_path = "services/order_service/main.py"
-        elif "user" in service.lower():
-            file_path = "services/user_service/main.py"
+    def generate(
+        self,
+        incident: dict[str, Any],
+        diagnosis: dict[str, Any],
+        project_root: str | Path | None = None,
+    ) -> PatchProposal:
+        service = str(incident.get("service") or "").strip().lower()
+        if service not in {"payment-service", "payment service"}:
+            raise ValueError("Patch proposals are currently supported only for the included payment-service demo.")
 
-        summary = (
-            f"Guard against dependency timeout and latency for {service} by adding a cautious timeout "
-            "and fallback path before the dependency gets retried."
+        root = Path(project_root).resolve() if project_root else Path(__file__).resolve().parents[3]
+        target = root / self.FILE_PATH
+        if not target.is_file() or target.is_symlink():
+            raise ValueError("The approved payment-service demo source is unavailable in this deployment.")
+        current_source = target.read_text(encoding="utf-8")
+        if current_source.count(self.OLD_BLOCK) == 1 and self.NEW_BLOCK not in current_source:
+            original = current_source
+        elif current_source.count(self.NEW_BLOCK) == 1 and self.OLD_BLOCK not in current_source:
+            original = current_source.replace(self.NEW_BLOCK, self.OLD_BLOCK, 1)
+        else:
+            raise ValueError("The payment-service source differs from the reviewed patch template.")
+        updated = original.replace(self.OLD_BLOCK, self.NEW_BLOCK, 1)
+        diff = "".join(
+            difflib.unified_diff(
+                original.splitlines(keepends=True),
+                updated.splitlines(keepends=True),
+                fromfile=f"a/{self.FILE_PATH}",
+                tofile=f"b/{self.FILE_PATH}",
+                n=3,
+            )
         )
 
-        diff = f"""
---- a/{file_path}
-+++ b/{file_path}
-@@
--    if mode == "database_timeout":
--        logger.warning("payment mode set to database_timeout")
--        with tracer.start_as_current_span("payment_service.database_query"):
--            await asyncio.sleep(6)
--        raise HTTPException(status_code=504, detail={{"code": "DATABASE_TIMEOUT", "message": "Database timed out while processing payment"}})
-+    if mode == "database_timeout":
-+        logger.warning("payment mode set to database_timeout")
-+        with tracer.start_as_current_span("payment_service.database_query"):
-+            await asyncio.sleep(2)
-+        return {{
-+            "status": "queued",
-+            "payment_id": "pay_demo_456",
-+            "message": "Payment request accepted but queued for retry due to dependency delay.",
-+        }}
-+
-+    if mode == "timeout":
-+        logger.warning("payment mode set to timeout")
-+        with tracer.start_as_current_span("payment_service.database_query"):
-+            await asyncio.sleep(2)
-+        return {{
-+            "status": "queued",
-+            "payment_id": "pay_demo_456",
-+            "message": "Payment request accepted but queued for retry due to dependency delay.",
-+        }}
-+"""
-
-        if service.lower() == "user-service":
-            diff = f"""
---- a/{file_path}
-+++ b/{file_path}
-@@
--    logger.info("health check requested")
--    return {{"status": "healthy", "service": "user-service"}}
-+    logger.info("health check requested")
-+    return {{"status": "healthy", "service": "user-service", "checks": ["database", "http"]}}
-+"""
-
-        risks = [
-            "This is a minimal prototype patch and should be reviewed by a human before deployment.",
-            "Retry queueing may change user-visible latency under pressure.",
-        ]
-
-        confidence = 0.85
-        if error_rate < 0.2 and timeout_rate < 0.1 and latency_ms < 1500:
-            confidence = 0.7
-
         return PatchProposal(
-            id=f"patch-{service.lower().replace('-', '')}",
-            service=service,
-            summary=summary,
-            file_path=file_path,
+            id="payment-database-timeout-queue-fallback",
+            service="payment-service",
+            summary="Queue payment requests when the demo database dependency times out.",
+            file_path=self.FILE_PATH,
             diff=diff,
-            confidence=confidence,
-            risks=risks,
+            confidence=0.7,
+            risks=[
+                "Changes the demo API response from HTTP 504 to an accepted queued response.",
+                "This proposal is specific to the included demo service; production semantics require human review.",
+            ],
         )

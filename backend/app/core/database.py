@@ -40,6 +40,15 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def initialize_database() -> None:
-    from app.models import auth
+    from app.models import Monitor, MonitorCheck, MonitorIncident, User, UserSession
 
-    Base.metadata.create_all(bind=engine, tables=[auth.User.__table__, auth.UserSession.__table__])
+    Base.metadata.create_all(
+        bind=engine,
+        tables=[
+            User.__table__,
+            UserSession.__table__,
+            Monitor.__table__,
+            MonitorCheck.__table__,
+            MonitorIncident.__table__,
+        ],
+    )

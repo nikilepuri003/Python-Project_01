@@ -1,5 +1,6 @@
-import logging
-import os
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+import threading
 import time
 import uuid
 
@@ -14,8 +15,9 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_
 
 from app.api.v1.routes import router as v1_router
 from app.core.config import get_settings
-from app.core.database import initialize_database
+from app.core.database import engine, initialize_database
 from app.core.logging import get_logger
+from app.services.monitoring import run_due_checks
 
 settings = get_settings()
 logger = get_logger("codepulse.backend", service="backend")
@@ -29,6 +31,73 @@ REQUEST_COUNT = Counter("codepulse_backend_http_requests_total", "Total backend 
 REQUEST_LATENCY = Histogram("codepulse_backend_http_request_duration_seconds", "Backend request latency in seconds", ["method", "path"])
 ERROR_COUNT = Counter("codepulse_backend_http_errors_total", "Total backend errors", ["path", "status"])
 
+
+def start_monitor_scheduler() -> tuple[threading.Event, threading.Thread] | None:
+    if not settings.monitor_scheduler_enabled:
+        logger.info("Monitor scheduler disabled by configuration")
+        return None
+
+    stop_event = threading.Event()
+
+    def scheduler_loop() -> None:
+        lock_connection = None
+        try:
+            if engine.dialect.name == "postgresql":
+                lock_connection = engine.connect()
+                acquired = bool(
+                    lock_connection.exec_driver_sql(
+                        "SELECT pg_try_advisory_lock(7362149051)"
+                    ).scalar()
+                )
+                lock_connection.commit()
+                if not acquired:
+                    logger.info("Another backend instance owns the monitor scheduler")
+                    return
+            while not stop_event.is_set():
+                try:
+                    count = run_due_checks(stop_event=stop_event)
+                    if count:
+                        logger.info("Scheduled monitor checks completed: %s", count)
+                except Exception:
+                    logger.exception("Scheduled monitor check batch failed")
+                stop_event.wait(5)
+        except Exception:
+            logger.exception("Monitor scheduler could not acquire its database lock")
+        finally:
+            if lock_connection is not None:
+                try:
+                    lock_connection.exec_driver_sql(
+                        "SELECT pg_advisory_unlock(7362149051)"
+                    )
+                    lock_connection.commit()
+                except Exception:
+                    logger.exception("Could not release monitor scheduler lock")
+                finally:
+                    lock_connection.close()
+
+    scheduler_thread = threading.Thread(
+        target=scheduler_loop,
+        name="codepulse-monitor-scheduler",
+        daemon=True,
+    )
+    scheduler_thread.start()
+    return stop_event, scheduler_thread
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
+    initialize_database()
+    scheduler = start_monitor_scheduler()
+    application.state.monitor_scheduler_enabled = scheduler is not None
+    try:
+        yield
+    finally:
+        if scheduler is not None:
+            stop_event, scheduler_thread = scheduler
+            stop_event.set()
+            scheduler_thread.join(timeout=15)
+
+
 app = FastAPI(
     title="CodePulse AI API",
     version="0.1.0",
@@ -36,6 +105,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+    lifespan=lifespan,
 )
 
 frontend_origin = settings.frontend_url.rstrip("/")
@@ -89,11 +159,6 @@ def metrics() -> Response:
 
 
 app.include_router(v1_router)
-
-
-@app.on_event("startup")
-def initialize_database_tables() -> None:
-    initialize_database()
 
 
 @app.get("/")

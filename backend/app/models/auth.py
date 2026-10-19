@@ -26,6 +26,10 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    monitors: Mapped[list["Monitor"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
 
 class UserSession(Base):

@@ -2,9 +2,9 @@
 
 CodePulse AI is a professional observability and AI-assisted incident response MVP for monitoring distributed APIs and microservices.
 
-## Current phases
+## Current status
 
-The project has already implemented the backend detection, diagnosis, patching, validation, GitHub metadata, and frontend dashboard phases. The remaining work is to finish the operational demo and live stack validation.
+The frontend supports Google sign-in, per-user accounts, manual one-off website checks, scheduled monitors, check history, persisted incidents, diagnosis, a demo patch proposal, and an explicit draft-PR action. Patch generation is currently limited to the included payment-service demo. Validation applies the patch in a disposable workspace, checks its Python syntax and timeout-fallback structure, then runs backend tests with a 120-second limit. It is not an operating-system sandbox; only the deterministic server-side patch and approved demo paths are accepted. GitHub creates a real draft PR only after validation and a successful authorized API response; otherwise the dashboard reports mock/not-configured status without a fake URL.
 
 ## Quick start
 
@@ -19,6 +19,22 @@ Draft public policy pages are served at `/privacy.html` and `/terms.html`. They 
 ### Check a website's health
 
 After signing in, enter a public website URL and choose **Check website**. The backend makes one HTTP(S) request (10-second timeout, without following redirects) and reports the observed HTTP status, reachability, and response time. A successful HTTP response only confirms that URL responded; it does not verify the website's database or other internal services. Private/local network addresses are rejected.
+
+### Scheduled monitors and incidents
+
+From the signed-in dashboard, add, edit, pause, resume, or delete up to 20 public HTTP(S) monitors, or select one of the fixed demo services when running the Docker Compose stack. Checks run at the selected interval (60 seconds to 24 hours), and the dashboard can show the latest result and recent history. A 5xx response, two consecutive non-healthy results, or a check taking at least five seconds opens or updates a persisted incident; a successful check resolves an open incident. Public checks pin connections to DNS-resolved public IPs, reject non-public/reserved destinations and unsafe ports, and do not follow redirects. Demo checks are restricted to three hard-coded Docker service names/ports and only accept private DNS results.
+
+The scheduler runs inside the FastAPI process. PostgreSQL advisory locking prevents multiple backend instances from running duplicate scheduler loops; local SQLite is intended for one backend process. Free hosting that sleeps cannot provide dependable continuous checks. Check history is limited to the most recent 1,000 checks per monitor; resolved incidents are retained up to 100 per monitor and for at most 90 days. Open incidents are retained until resolved.
+
+Monitoring endpoints require the same Bearer session token used by the frontend. See [docs/api.md](docs/api.md) for the API surface.
+
+### Incident diagnosis, patch validation, and draft PR
+
+For an open incident on a monitor named `payment-service`, request a diagnosis, then choose **Propose and validate demo patch**. The deterministic demo patch changes `services/payment_service/main.py`; other monitor names are intentionally not mapped to arbitrary source code. The backend applies it in a temporary copy, verifies the approved target and expected timeout-fallback structure, and runs backend tests with a 120-second timeout. The diff and results are shown before any GitHub action.
+
+To create a real draft PR, configure `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPOSITORY`, and `GITHUB_BASE_BRANCH` on the backend. Use a fine-grained token restricted to the intended repository with **Contents: Read and write** and **Pull requests: Read and write**. Keep the token server-side; never add it to the frontend or paste it into chat. The service re-checks that the diff applies to the configured base branch, creates a branch and commit through GitHub's Git Database API, then requests a draft PR. It does not merge or deploy. If configuration is absent, it reports mock/not-configured and creates no branch, commit, PR, or fake link.
+
+The included patch template is a demo-only example, not a diagnosis-specific production repair. Review its diff and validation results before requesting a PR. Validation uses an ephemeral copy and fixed Git/pytest commands with timeouts, but is not an OS/container security boundary.
 
 ### Backend
 
@@ -54,6 +70,8 @@ The root `render.yaml` deploys the frontend as a static site and the FastAPI bac
 4. After deployment, add the frontend's `onrender.com` URL to the OAuth client's **Authorized JavaScript origins** in Google Cloud Console.
 
 Free Render web services spin down after 15 minutes without traffic, so the first request after inactivity can take about a minute. This is suitable for a demo, not production.
+
+The in-process monitor scheduler only runs while the backend is awake. For dependable scheduling, deploy an always-on backend/worker with a persistent PostgreSQL database. The temporary Free Render database used by the current deployment has a scheduled expiration; upgrade or migrate it before that date if account and monitor data must be retained.
 
 ### Demo: end-to-end incident lifecycle
 

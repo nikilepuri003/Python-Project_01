@@ -5,6 +5,7 @@ from typing import Any
 
 from app.ai.providers.base import AIDiagnosis
 from app.ai.providers.factory import get_ai_provider
+from app.ai.providers.mock import MockAIProvider
 
 logger = logging.getLogger("codepulse.diagnosis")
 
@@ -29,8 +30,9 @@ class DiagnosisEngine:
             f"p95_latency_ms={latency_ms:.0f}; dependency_failures={dependency_failures}"
         )
 
-        diagnosis = self._safe_diagnose(incident)
+        diagnosis, provider_status = self._safe_diagnose(incident)
         response = diagnosis.model_dump()
+        response["provider_status"] = provider_status
         response["evidence_summary"] = evidence_summary
         response["recommended_action"] = response.get("recommended_fix", "Review the degraded service and validate the dependency path.")
         if "payment" in service.lower() or "payment" in title.lower():
@@ -42,25 +44,29 @@ class DiagnosisEngine:
                 "Review recent DB auth, timeout, and network changes and rerun the payment validation path."
             )
 
-        response["root_cause"] = service
-        if "payment" in service.lower() or "payment" in title.lower():
-            response["confidence"] = max(float(response.get("confidence", 0.0) or 0.0), 0.8)
-        else:
-            response["confidence"] = min(0.68, max(0.35, (error_rate + timeout_rate + (latency_ms / 10000)) / 3))
+        if provider_status == "mock demo":
+            if "payment" in service.lower() or "payment" in title.lower():
+                response["confidence"] = max(float(response.get("confidence", 0.0) or 0.0), 0.8)
+            else:
+                response["confidence"] = min(0.68, max(0.35, (error_rate + timeout_rate + (latency_ms / 10000)) / 3))
         response.setdefault("affected_components", [service])
         response.setdefault("files_to_change", [])
         response.setdefault("risks", [])
         response.setdefault("evidence", [evidence_summary])
         return response
 
-    def _safe_diagnose(self, incident: dict[str, Any]) -> AIDiagnosis:
+    def _safe_diagnose(self, incident: dict[str, Any]) -> tuple[AIDiagnosis, str]:
         try:
             raw = self.provider.diagnose(incident, incident.get("evidence") or {})
             coerced = self._coerce_diagnosis(raw)
-            return coerced
+            provider_status = "mock demo" if isinstance(self.provider, MockAIProvider) else "real provider"
+            return coerced, provider_status
         except Exception as exc:  # pragma: no cover - defensive fallback path
-            logger.warning("AI diagnosis failed; using controlled fallback diagnosis: %s", exc)
-            return self._fallback_diagnosis(incident)
+            logger.warning(
+                "AI diagnosis failed; using controlled fallback diagnosis (%s)",
+                type(exc).__name__,
+            )
+            return self._fallback_diagnosis(incident), "fallback: provider unavailable or response invalid"
 
     def _coerce_diagnosis(self, raw: Any) -> AIDiagnosis:
         if isinstance(raw, AIDiagnosis):

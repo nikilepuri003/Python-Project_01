@@ -16,7 +16,9 @@ class Settings(BaseSettings):
     github_token: str = Field(default="", alias="GITHUB_TOKEN")
     github_owner: str = Field(default="", alias="GITHUB_OWNER")
     github_repository: str = Field(default="", alias="GITHUB_REPOSITORY")
+    github_base_branch: str = Field(default="main", alias="GITHUB_BASE_BRANCH")
     jwt_secret_key: str = Field(default="change-me-in-development", alias="JWT_SECRET_KEY")
+    monitor_scheduler_enabled: bool = Field(default=True, alias="MONITOR_SCHEDULER_ENABLED")
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
